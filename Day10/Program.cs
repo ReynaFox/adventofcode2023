@@ -1,9 +1,8 @@
-﻿using System.Diagnostics;
-using System.Drawing;
-using System.Linq;
+﻿using System.Drawing;
 
 //part1();
 part2();
+part2alt();
 
 
 static void part1() {
@@ -207,6 +206,83 @@ static void part2() {
 			if (p.Y < inout.GetLength(1)-1 && inout[p.X, p.Y+1] == empty) queue.Enqueue(new Point(p.X, p.Y+1));
 		}
 	}
+}
+
+static void part2alt() {
+	var map = new List<Map.Tile[]>();
+
+	var startPos = new Point(0, 0);
+	var y = 0;
+	foreach (var line in File.ReadLines("input.txt")) {
+		if (string.IsNullOrEmpty(line)) continue;
+
+		var mapLine = new Map.Tile[line.Length];
+		for (int i = 0; i < line.Length; i++) {
+			mapLine[i] = line[i] switch {
+				'.' => Map.Tile.empty,
+				'S' => Map.Tile.start,
+				'|' => Map.Tile.ns,
+				'-' => Map.Tile.ew,
+				'L' => Map.Tile.ne,
+				'J' => Map.Tile.nw,
+				'7' => Map.Tile.sw,
+				'F' => Map.Tile.se,
+			};
+			if (mapLine[i] == Map.Tile.start)
+				startPos = new Point(i, y);
+		}
+		map.Add(mapLine);
+		y++;
+	}
+
+	var path = new List<Point>();
+	foreach (var dir in Enum.GetValues(typeof(Map.Direction)).Cast<Map.Direction>()) {
+		var move = Map.directions[dir];
+		path.Clear();
+		path.Add(startPos);
+		var endDir = tracePath(map, new Point(startPos.X+move.X, startPos.Y+move.Y), dir, path);
+		var end = path[^1];
+		if (map[end.Y][end.X] == Map.Tile.start) {
+			map[end.Y][end.X] = (dir, endDir) switch {
+				(Map.Direction.south, Map.Direction.south) or
+					(Map.Direction.north, Map.Direction.north) => Map.Tile.ns,
+
+				(Map.Direction.east, Map.Direction.east) or
+					(Map.Direction.west, Map.Direction.west) => Map.Tile.ew,
+
+				(Map.Direction.east, Map.Direction.north) or
+					(Map.Direction.south, Map.Direction.west) => Map.Tile.se,
+				(Map.Direction.south, Map.Direction.east) or
+					(Map.Direction.west, Map.Direction.north) => Map.Tile.sw,
+
+				(Map.Direction.north, Map.Direction.east) or
+					(Map.Direction.west, Map.Direction.south) => Map.Tile.nw,
+				(Map.Direction.north, Map.Direction.west) or
+					(Map.Direction.east, Map.Direction.south) => Map.Tile.ne,
+			};
+			break;
+		}
+	}
+
+	// Write a map with only the pipes, and replace S with the actual pipe piece
+	var pipesOnly = new Map.Tile[map[0].Length, map.Count];
+	foreach (var point in path) {
+		pipesOnly[point.X, point.Y] = map[point.Y][point.X];
+	}
+
+	var count = 0;
+	for (y = 0; y < pipesOnly.GetLength(1); y++) {
+		var inside = false;
+		for (int x = 0; x < pipesOnly.GetLength(0); x++) {
+			var tile = pipesOnly[x, y];
+			if (tile == Map.Tile.empty) {
+				if (inside) count++;
+			} else if (tile == Map.Tile.ns || tile == Map.Tile.se || tile == Map.Tile.sw) {
+				inside = !inside;
+			}
+		}
+	}
+	Console.WriteLine(count);
 }
 
 static Map.Direction tracePath(List<Map.Tile[]> map, Point start, Map.Direction oldTo, List<Point> path) {
